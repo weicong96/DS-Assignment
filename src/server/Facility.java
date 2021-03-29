@@ -1,7 +1,7 @@
 package server;
 
 import java.util.ArrayList;
-
+import java.util.Random;
 public class Facility {
 	private String name;
 	private ArrayList<Booking> bookings = new ArrayList<Booking>();
@@ -15,25 +15,37 @@ public class Facility {
 	public void setName(String name) {
 		this.name = name;
 	}
-	public void addBooking(Booking booking) {
-		System.out.println("Added booking for "+this.name);
+	public String addBooking(Booking booking) {
+		booking.setConfirmID(this.generateID());
 		this.bookings.add(booking);
+		return booking.getConfirmID();
 	}
-	public boolean hasSameBooking(Booking booking) {
+	public int checkAndGetConflictBooking(Booking booking) {
 		int index = -1;
 		for(int i = 0; i < this.bookings.size(); i++) {
-			if(this.bookings.get(i).getStartMinuteOfDay() >= booking.getStartMinuteOfDay() && this.bookings.get(i).getEndMinuteOfDay() <= booking.getEndMinuteOfDay()) {
+			if(this.bookings.get(i).getDay() == booking.getDay() && bookings.get(i).getStartMinuteOfDay() >= booking.getStartMinuteOfDay() && this.bookings.get(i).getEndMinuteOfDay() <= booking.getEndMinuteOfDay()) {
 				index = i;
 				break;
 			}
 		}
-		return index != -1;	
+		return index;
 	}
 	public ArrayList<Booking> getBookings() {
 		return bookings;
 	}
 	public void setBookings(ArrayList<Booking> bookings) {
 		this.bookings = bookings;
+	}
+	private String generateID() {
+		char[] chars = "abcdefghijklmnopqrstuvwxyz0123456789".toCharArray();
+		StringBuilder sb = new StringBuilder(10);
+		Random random = new Random();
+		for (int i = 0; i < 20; i++) {
+		    char c = chars[random.nextInt(chars.length)];
+		    sb.append(c);
+		}
+		String output = sb.toString();
+		return output;
 	}
 	public short[] getBookingIntervals(byte day) {
 		short[] singleTime = new short[24*60];
@@ -47,7 +59,7 @@ public class Facility {
 			}else {
 				boolean timeNotOverlap = true;
 				for(int j = 0; j < this.bookings.size(); j++) {
-					if(this.bookings.get(j).getStartMinuteOfDay() <= i && this.bookings.get(j).getEndMinuteOfDay() >= i) {
+					if(this.bookings.get(i).getDay() == day && this.bookings.get(j).getStartMinuteOfDay() <= i && this.bookings.get(j).getEndMinuteOfDay() >= i) {
 						timeNotOverlap = false;
 						break;
 					}
@@ -80,5 +92,16 @@ public class Facility {
 			returnInterval[i+1] = bookingInterval.get(i/2)[1];
 		}
 		return returnInterval;
+	}
+	public int getBookingWithConfirmationID(String confirmID) {
+		for(int i = 0; i < this.bookings.size();i++) {
+			if(this.bookings.get(i).getConfirmID().equals(confirmID)) {
+				return i;
+			}
+		}
+		return -1;
+	}
+	public void replaceBooking(int index, Booking booking) {
+		this.bookings.set(index, booking);
 	}
 }

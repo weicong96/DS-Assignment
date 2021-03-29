@@ -28,6 +28,21 @@ public class Client {
 			e.printStackTrace();
 		}
 	}
+	public HashMap<String, Object> sendMonitorRequest(String facilityName, short duration){
+		HashMap<String, Object> request = new HashMap<String, Object>();
+		request.put("service_type", Constants.MONITOR_AVALIABILITY);
+		request.put("facility_name", facilityName);
+		request.put("duration", duration);
+		return this.sendRequest(request);
+	}
+	public HashMap<String, Object> sendChangeRequest(String confirmationID, short offset){
+		HashMap<String, Object> request = new HashMap<String, Object>();
+		request.put("service_type", Constants.CHANGE_BOOKING);
+		request.put("confirm_id", confirmationID);
+		request.put("offset", offset);
+		return this.sendRequest(request);
+		
+	}
 	public HashMap<String, Object> sendQueryRequest(String facilityName, byte[] days) {
 		HashMap<String, Object> request = new HashMap<String, Object>();
 		request.put("service_type", Constants.QUERY_FACILITY);

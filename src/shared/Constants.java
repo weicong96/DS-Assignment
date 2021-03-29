@@ -19,6 +19,7 @@ public class Constants {
 			"Saturday",
 			"Sunday"
 	};
+	
 	public static String getDay(byte dayOfWeek) {
 		return days[dayOfWeek];
 	}

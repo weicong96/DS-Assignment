@@ -16,6 +16,14 @@ public class Utils {
 		minute = minute % 60;
 		return String.format("%02d:%02d", hour, minute);
 	}
+	public static short parseTextToMinuteOfDay(String text) {
+		String[] parts = text.split(":");
+		
+		byte hours = Byte.parseByte(parts[0]);
+		byte mins = Byte.parseByte(parts[1]);
+		short offsetDuration = (short)(hours * 60 + mins);
+		return offsetDuration;
+	}
 	public static byte[] combineByteArray(byte[] a, byte[] b) {
 		byte[] combined = new byte[a.length + b.length];
 		for (int i = 0; i < combined.length; ++i){
@@ -96,7 +104,9 @@ public class Utils {
 			}else if (payload.get(field).getClass().equals(Byte.class)) {
 				result = combineByteArray(result, new byte[] {4});
 				result = combineByteArray(result, new byte[] {(byte)payload.get(field)});
-				
+			}else if (payload.get(field).getClass().equals(Short.class)) {
+				result = combineByteArray(result, new byte[] {5});
+				result = combineByteArray(result, toBytes((short) payload.get(field)));
 			}
 		}
 		return result;
@@ -169,6 +179,12 @@ public class Utils {
 				case 4:
 					payload.put(fieldPropertyName, (byte)data[byte_offset]);
 					byte_offset++;
+					break;
+				case 5:
+					short shortValue = ByteBuffer.wrap(Arrays.copyOfRange(data, byte_offset, byte_offset+2)).getShort();
+					payload.put(fieldPropertyName, shortValue);
+					byte_offset += 2;
+					break;
 			} 
 			field_count ++;
 		}
