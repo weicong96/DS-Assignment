@@ -12,22 +12,24 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import shared.Constants;
+import shared.Constants.INVOCATION_TYPE;
 import shared.Utils;
 
 public class Server {
 	private DatagramSocket socket;
 	private byte[] buffer;
+	private INVOCATION_TYPE invocationType;
 	private boolean running = true;
 	private Facility[] facilities;
-	private char padString = '_';
-	
+	private int numberOfSent = 0;
 	private HashMap<String, HashMap<String, Object>> histories = new HashMap<String, HashMap<String, Object>>();
 	//facility name indexed by list of monitors
 	private HashMap<String, ArrayList<Monitor>> monitors = new HashMap<String, ArrayList<Monitor>>();
-	public Server(int port) {
+	public Server(int port, INVOCATION_TYPE type) {
 		try {
 			socket = new DatagramSocket(port);
 			buffer = new byte[Constants.BUFFER_SIZE];
+			this.invocationType = type;
 		} catch (SocketException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -48,15 +50,28 @@ public class Server {
 		byte[] replyBuffer = Utils.marshallPayload(reply);
         DatagramPacket packet = new DatagramPacket(replyBuffer, replyBuffer.length, request.getAddress(), request.getPort());
         try {
-			socket.send(packet);
+        	histories.put(identifier, reply);
+        	if(numberOfSent % 3 == 0) {
+    			socket.send(packet);
+        	}
+        	this.numberOfSent ++;
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
+	public boolean sendReplyEarly(String identifier, DatagramPacket request) {
+		if(this.histories.containsKey(identifier)) {
+			HashMap<String, Object> reply = this.histories.get(identifier);
+			this.sendReply(socket, reply, identifier, request);
+			System.out.println("early sending");
+			return true;
+		}
+		return false;
+	}
 	public void informAllMonitors(Facility facility) {
 		//check and see if its expired, if yes remove it
-		/*for(Entry<String, ArrayList<Monitor>> entry : this.monitors.entrySet()) {
+		for(Entry<String, ArrayList<Monitor>> entry : this.monitors.entrySet()) {
 		    String key = entry.getKey();
 		    ArrayList<Monitor> value = entry.getValue();
 		    
@@ -65,13 +80,13 @@ public class Server {
 		    		value.remove(i);
 		    	}
 		    }
-		}*/
+		}
 		
-		ArrayList<Monitor> monitors = this.monitors.getOrDefault(facility, new ArrayList<Monitor>());
+		ArrayList<Monitor> monitors = this.monitors.getOrDefault(facility.getName(), new ArrayList<Monitor>());
 		for(int i = 0 ; i < monitors.size(); i++) {
 			String address = monitors.get(i).getClientAddress();
 			int port = monitors.get(i).getClientPort();
-			
+			System.out.println("Notifying : "+ address+ " port: "+port);
 			HashMap<String, Object> reply = new HashMap<String, Object>();
 			reply.put("service_type", Constants.MONITOR_AVALIABILITY);
 			String uniqueID = address+":"+port+"_"+monitors.get(i).getRequestId();
@@ -82,6 +97,7 @@ public class Server {
 			for(byte j = 0; j < 7; j++) {
 				reply.put("timeslots_avaliable_"+j, facilities[facilityIndex].getBookingIntervals(j));
 			}		
+			
 			byte[] buffer = new byte[Constants.BUFFER_SIZE];
 			
 			DatagramPacket packet;
@@ -106,6 +122,24 @@ public class Server {
 		}
 		return facilityIndex;
 	}
+	public int getFacilityByConfirmID(String confirmID) {
+		int facilityIndex = -1;
+		for(int i = 0; i < this.facilities.length;i++) {
+			boolean found = false;
+			for(int j = 0; j < this.facilities[i].getBookings().size(); j++) {
+				if(this.facilities[i].getBookings().get(j).getConfirmID().equals(confirmID)) {
+					found = true;
+					break;
+				}
+			}
+			if(found) {
+				facilityIndex = i;
+				break;
+			}
+		}
+		return facilityIndex;
+		
+	}
 	public void start() {
 		while(running) {
             DatagramPacket packet = new DatagramPacket(this.buffer, this.buffer.length);
@@ -116,6 +150,12 @@ public class Server {
 				String clientDetails =packet.getAddress().getHostAddress()+":"+packet.getPort(); 
 				int requestId = (int) requestPayload.get("request_id");
 				String uniqueID =  clientDetails+"_"+(requestId);
+				if(this.invocationType == INVOCATION_TYPE.AT_MOST_ONCE) {
+					boolean sent = this.sendReplyEarly(uniqueID, packet);
+					if(sent) {
+						continue;
+					}
+				}
 				
 				byte serviceType = (byte)requestPayload.get("service_type");
 				
@@ -149,15 +189,8 @@ public class Server {
 						String startTime = (String) requestPayload.get("start_time");
 						String endTime = (String) requestPayload.get("end_time");
 						byte day = (byte) requestPayload.get("day");
-						
-						// TODO: Combine this later
-						facilityIndex = -1;
-						for(int i = 0; i < this.facilities.length;i++) {
-							if(this.facilities[i].getName().equals(facilityName)) {
-								facilityIndex = i;
-								break;
-							}
-						}
+				
+						facilityIndex = this.getFacilityIndexByName(facilityName);
 						if(facilityIndex == -1) {
 							//indicate success is false
 							reply.put("success", ((byte)0));
@@ -177,11 +210,10 @@ public class Server {
 							break;
 						}
 						confirmID = this.facilities[facilityIndex].addBooking(booking);
-						this.informAllMonitors(this.facilities[facilityIndex]);
-						//need to inform
 						reply.put("success", ((byte)1));
 						reply.put("confirm_id", confirmID);
-						
+
+						this.informAllMonitors(this.facilities[facilityIndex]);
 						break;
 					case Constants.CHANGE_BOOKING:
 						confirmID = (String) requestPayload.get("confirm_id");
@@ -203,7 +235,7 @@ public class Server {
 									break;
 								}
 								this.facilities[i].replaceBooking(bookingIndex, newBooking);
-								
+								this.informAllMonitors(this.facilities[i]);
 								
 								break;
 							}
@@ -212,13 +244,50 @@ public class Server {
 					case Constants.MONITOR_AVALIABILITY:
 						facilityName = (String) requestPayload.get("facility_name");
 						short duration = (short) requestPayload.get("duration");
-					
-						Monitor monitor = new Monitor(packet.getAddress().getHostAddress(), packet.getPort(), (Calendar.getInstance().getTimeInMillis()/1000l) + duration, requestId);
+						facilityIndex = getFacilityIndexByName(facilityName);
+						if(facilityIndex == -1) {
+							//indicate success is false
+							reply.put("success", ((byte)0));
+							reply.put("error_message", "Error: Facility with the name "+requestPayload.get("facility_name")+" not found");
+							break;
+						}else {
+							reply.put("success", ((byte) 1));
+						}
+						Monitor monitor = new Monitor(packet.getAddress().getHostAddress(), packet.getPort(), (Calendar.getInstance().getTimeInMillis()/1000l) + (duration * 60), requestId);
 						
 						ArrayList<Monitor> monitors = this.monitors.getOrDefault(facilityName, new ArrayList<Monitor>());
 						monitors.add(monitor);
 						this.monitors.put(facilityName, monitors);
-						System.out.println("Updated monitor");
+						
+						break;
+					case Constants.CANCEL_BOOKING:
+						String confirmationID = (String) requestPayload.get("confirm_id");
+						facilityIndex = getFacilityByConfirmID(confirmationID);
+						if(facilityIndex == -1) {
+							//indicate success is false
+							reply.put("success", ((byte)0));
+							reply.put("error_message", "Error: Booking with confirmation ID "+confirmationID+" not found");
+							break;
+						}else {
+							reply.put("success", ((byte) 1));
+						}
+						ArrayList<Booking> bookings = this.facilities[facilityIndex].getBookings();
+						int bookingIndex = -1;
+						for(int i = 0; i < bookings.size(); i++) {
+							if(bookings.get(i).getConfirmID().equals(confirmationID)) {
+								bookingIndex = i;
+								break;
+							}
+						}
+						bookings.remove(bookingIndex);
+						this.facilities[facilityIndex].setBookings(bookings);
+						break;
+					case Constants.LIST_FACILITY:
+						String[] facilitiesNames = new String[this.facilities.length];
+						for(int i = 0 ; i < facilitiesNames.length; i++) {
+							facilitiesNames[i] = this.facilities[i].getName();
+						}
+						reply.put("facility_names", facilitiesNames);
 						break;
 				}
 				this.sendReply(socket, reply, uniqueID, packet);

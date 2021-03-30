@@ -59,7 +59,7 @@ public class Facility {
 			}else {
 				boolean timeNotOverlap = true;
 				for(int j = 0; j < this.bookings.size(); j++) {
-					if(this.bookings.get(i).getDay() == day && this.bookings.get(j).getStartMinuteOfDay() <= i && this.bookings.get(j).getEndMinuteOfDay() >= i) {
+					if(this.bookings.get(j).getDay() == day && this.bookings.get(j).getStartMinuteOfDay() <= i && this.bookings.get(j).getEndMinuteOfDay() >= i) {
 						timeNotOverlap = false;
 						break;
 					}

@@ -11,6 +11,12 @@ import java.util.Set;
 import java.util.TimeZone;
 
 public class Utils {
+	public static String parseMinuteOfDay(short minuteOfDay) {
+		int hour = (minuteOfDay / 60);
+		int minute = (minuteOfDay % 60);
+		
+		return getFormat(hour, minute);
+	}
 	public static String getFormat(int hour, int minute) {
 		hour = hour % 24;
 		minute = minute % 60;
@@ -107,6 +113,15 @@ public class Utils {
 			}else if (payload.get(field).getClass().equals(Short.class)) {
 				result = combineByteArray(result, new byte[] {5});
 				result = combineByteArray(result, toBytes((short) payload.get(field)));
+			}else if (payload.get(field) instanceof String[]) {
+				String[] data = (String[]) payload.get(field);
+				
+				result = combineByteArray(result, new byte[] {6});
+				result = combineByteArray(result, toBytes(data.length));
+				for(int i = 0; i < data.length; i++) {
+					result = combineByteArray(result, toBytes(data[i].length()));
+					result = combineByteArray(result, data[i].getBytes());
+				}
 			}
 		}
 		return result;
@@ -184,6 +199,22 @@ public class Utils {
 					short shortValue = ByteBuffer.wrap(Arrays.copyOfRange(data, byte_offset, byte_offset+2)).getShort();
 					payload.put(fieldPropertyName, shortValue);
 					byte_offset += 2;
+					break;
+				case 6:
+					int stringArrayLength = ByteBuffer.wrap(Arrays.copyOfRange(data, byte_offset, byte_offset+4)).getInt();
+					byte_offset += 4;
+					String[] stringValues = new String[stringArrayLength];
+					
+					for(int i = 0; i < (stringArrayLength); i++) {
+						int stringValueLength = ByteBuffer.wrap(Arrays.copyOfRange(data, byte_offset, byte_offset + 4)).getInt();  
+						byte_offset += 4;
+						
+						String stringValue = new String(Arrays.copyOfRange(data, byte_offset, byte_offset+stringValueLength));
+						byte_offset += stringValueLength;
+						
+						stringValues[i] = stringValue;
+					}
+					payload.put(fieldPropertyName, stringValues);
 					break;
 			} 
 			field_count ++;
