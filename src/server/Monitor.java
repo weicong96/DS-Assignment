@@ -1,5 +1,6 @@
 package server;
 
+// contains details about how each monitoring request can reach its client, expiry time and what request id to use
 public class Monitor {
 	private String clientAddress;
 	private int clientPort;

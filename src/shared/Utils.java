@@ -55,6 +55,36 @@ public class Utils {
 	  
 	  return result;
 	}
+	public static void printContents(HashMap<String, Object> payload, boolean sending) {
+		System.out.println("INFO: "+(sending ? "Sending" : "Receiving ")+" the following contents");
+		Set<String> fieldsSet = payload.keySet();
+		for(String field: fieldsSet) {
+			Object value = payload.get(field);
+			System.out.print("\t "+field+" : ");
+			if(value instanceof byte[]) {
+				byte[] byteArray = (byte[])value;
+				for(int i = 0; i < byteArray.length;i++) {
+					System.out.print("\n\t\t Item "+i+" : "+byteArray[i]);
+				}
+				System.out.print("\n");
+			}else if(value instanceof String[]) {
+
+				String[] stringArray = (String[])value;
+				for(int i = 0; i < stringArray.length;i++) {
+					System.out.print("\n\t\t Item "+i+" : "+stringArray[i]);
+				}
+				System.out.print("\n");
+			}else if(value instanceof short[]) {
+				short[] shortArray = (short[])value;
+				for(int i = 0; i < shortArray.length;i++) {
+					System.out.print("\n\t\t Item "+i+" : "+shortArray[i]);
+				}
+				System.out.print("\n");
+			}else {
+				System.out.print(payload.get(field)+"\n");
+			}
+		}
+	}
 	public static byte[] marshallPayload(HashMap<String, Object> _payload) {
 		HashMap<String, Object> payload = (HashMap<String, Object>) _payload.clone();
 		byte messageType = (byte)payload.get("message_type");
@@ -97,26 +127,23 @@ public class Utils {
 					result = combineByteArray(result, new byte[] {data[i]});
 				}
 			}else if(payload.get(field) instanceof short[]) {
-				System.out.println("Encoding "+ field);
-				
 				short[] data = (short[])payload.get(field);
 				result = combineByteArray(result, new byte[] {3});
 				result = combineByteArray(result, toBytes(data.length));
 				for(int i = 0; i < data.length; i++) {
 					byte[] byteValues = toBytes(data[i]);
-					System.out.println(byteValues.length+ " byte values ");
 					result = combineByteArray(result, byteValues);
 				}
 			}else if (payload.get(field).getClass().equals(Byte.class)) {
-				result = combineByteArray(result, new byte[] {4});
+				result = combineByteArray(result, new byte[] {5});
 				result = combineByteArray(result, new byte[] {(byte)payload.get(field)});
 			}else if (payload.get(field).getClass().equals(Short.class)) {
-				result = combineByteArray(result, new byte[] {5});
+				result = combineByteArray(result, new byte[] {6});
 				result = combineByteArray(result, toBytes((short) payload.get(field)));
 			}else if (payload.get(field) instanceof String[]) {
 				String[] data = (String[]) payload.get(field);
 				
-				result = combineByteArray(result, new byte[] {6});
+				result = combineByteArray(result, new byte[] {4});
 				result = combineByteArray(result, toBytes(data.length));
 				for(int i = 0; i < data.length; i++) {
 					result = combineByteArray(result, toBytes(data[i].length()));
@@ -160,7 +187,6 @@ public class Utils {
 					String propertyValue = new String(Arrays.copyOfRange(data, byte_offset, byte_offset+propertyLength));
 					byte_offset += propertyLength;
 					payload.put(fieldPropertyName, propertyValue);
-					System.out.println("decoded value"+fieldPropertyName+" as "+propertyValue);
 					break;
 				case 1:
 					int value = ByteBuffer.wrap(Arrays.copyOfRange(data, byte_offset, byte_offset+4)).getInt();
@@ -185,27 +211,18 @@ public class Utils {
 					
 					short[] shortValues = new short[shortArrayLength];
 					
-					for(int i = 0; i < (shortArrayLength); i++) {
+					for(int i = 0; i < shortArrayLength; i++) {
 						shortValues[i] = ByteBuffer.wrap(Arrays.copyOfRange(data, byte_offset, byte_offset + 2)).getShort(); 
 						byte_offset += 2;
 					}
 					payload.put(fieldPropertyName, shortValues);
 					break;
 				case 4:
-					payload.put(fieldPropertyName, (byte)data[byte_offset]);
-					byte_offset++;
-					break;
-				case 5:
-					short shortValue = ByteBuffer.wrap(Arrays.copyOfRange(data, byte_offset, byte_offset+2)).getShort();
-					payload.put(fieldPropertyName, shortValue);
-					byte_offset += 2;
-					break;
-				case 6:
 					int stringArrayLength = ByteBuffer.wrap(Arrays.copyOfRange(data, byte_offset, byte_offset+4)).getInt();
 					byte_offset += 4;
 					String[] stringValues = new String[stringArrayLength];
 					
-					for(int i = 0; i < (stringArrayLength); i++) {
+					for(int i = 0; i < stringArrayLength; i++) {
 						int stringValueLength = ByteBuffer.wrap(Arrays.copyOfRange(data, byte_offset, byte_offset + 4)).getInt();  
 						byte_offset += 4;
 						
@@ -216,6 +233,16 @@ public class Utils {
 					}
 					payload.put(fieldPropertyName, stringValues);
 					break;
+				case 5:
+					payload.put(fieldPropertyName, (byte)data[byte_offset]);
+					byte_offset++;
+					break;
+				case 6:
+					short shortValue = ByteBuffer.wrap(Arrays.copyOfRange(data, byte_offset, byte_offset+2)).getShort();
+					payload.put(fieldPropertyName, shortValue);
+					byte_offset += 2;
+					break;
+				
 			} 
 			field_count ++;
 		}

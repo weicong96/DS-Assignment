@@ -61,6 +61,7 @@ public class Booking {
 	public int getEndMinuteOfDay() {
 		return (this.getEndHour() * 60) + this.getEndMinute();
 	}
+	//offset booking using the 0 - 1440 value range for minutes in a day
 	public void offsetBooking(short offset) {
 		short newStart = (short)(this.getStartMinuteOfDay() + offset);
 		short newEnd = (short)(this.getEndMinuteOfDay() + offset);

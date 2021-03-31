@@ -23,19 +23,21 @@ public class Client {
 		try {
 			socket = new DatagramSocket();
 			socket.setSoTimeout(Constants.TIMEOUT);
-			address = InetAddress.getByName("localhost");
-			System.out.println("running on port"+ socket.getPort());
+			address = InetAddress.getByName("192.168.1.117");
 		} catch (SocketException | UnknownHostException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
+	
+	// send request payload for list facility
 	public HashMap<String, Object> sendListFacilityNames(){
 		HashMap<String, Object> request = new HashMap<String, Object>();
 		request.put("service_type", Constants.LIST_FACILITY);
 		
 		return this.sendRequest(request);
 	}
+	// send request payload for cancel booking
 	public HashMap<String, Object> sendCancelRequest(String confirmID){
 		HashMap<String, Object> request = new HashMap<String, Object>();
 		request.put("service_type", Constants.CANCEL_BOOKING);
@@ -43,6 +45,7 @@ public class Client {
 		
 		return this.sendRequest(request);
 	}
+	// send request payload for monitoring facility bookings
 	public HashMap<String, Object> sendMonitorRequest(String facilityName, short duration){
 		HashMap<String, Object> request = new HashMap<String, Object>();
 		request.put("service_type", Constants.MONITOR_AVALIABILITY);
@@ -50,6 +53,7 @@ public class Client {
 		request.put("duration", duration);
 		return this.sendRequest(request);
 	}
+	// send request payload for changing booking
 	public HashMap<String, Object> sendChangeRequest(String confirmationID, short offset){
 		HashMap<String, Object> request = new HashMap<String, Object>();
 		request.put("service_type", Constants.CHANGE_BOOKING);
@@ -58,6 +62,7 @@ public class Client {
 		return this.sendRequest(request);
 		
 	}
+	// send request payload for querying facility bookings
 	public HashMap<String, Object> sendQueryRequest(String facilityName, byte[] days) {
 		HashMap<String, Object> request = new HashMap<String, Object>();
 		request.put("service_type", Constants.QUERY_FACILITY);
@@ -76,6 +81,7 @@ public class Client {
 		
 		return this.sendRequest(request);
 	}
+	// encapsulated method for listening specified duration
 	public HashMap<String, Object> listenForReply(int timeout) throws IOException {
 		HashMap<String, Object> replyPayload = null;
 		byte[] buffer = new byte[Constants.BUFFER_SIZE];
@@ -86,8 +92,8 @@ public class Client {
     	replyPayload = Utils.unmarshallPayload(packet.getData());
     	return replyPayload;
 	}
+	// send 
 	public HashMap<String, Object> sendRequest(HashMap<String, Object> requestPayload) {
-		String data = "";
 		HashMap<String, Object> replyPayload = null;
 		requestPayload.put("message_type", (byte)0);
 		requestPayload.put("request_id", this.REQUEST_ID);
@@ -95,14 +101,16 @@ public class Client {
 		byte[] buff = Utils.marshallPayload(requestPayload);
 		this.REQUEST_ID ++;
 		boolean waiting = true;
+		// repeatedly keep trying to send for specific duration, stop/end when reply comes back
 		while(waiting) {
 			try {
+				Utils.printContents(requestPayload, true);
 				this.socket.send(new DatagramPacket(buff, buff.length, address, Constants.PORT));
     			
             	replyPayload = this.listenForReply(Constants.TIMEOUT);
+        		Utils.printContents(replyPayload, false);
             	if(((byte) replyPayload.get("service_type")) == ((byte) requestPayload.get("service_type"))) {
             		if(((int) replyPayload.get("reply_id")) == ((int) requestPayload.get("request_id"))) {
-            			//same reply so stop sending it
                     	break;
                 	}
             	}

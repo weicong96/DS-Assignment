@@ -1,9 +1,6 @@
 package client;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
@@ -62,6 +59,7 @@ public class ClientRunner {
 		Scanner scanner = new Scanner(System.in);
 		String input = "";
 		while(!input.equals("q")) {
+			// Show menu, prompt for selection
 			System.out.println("Choose from the avaliable options in the menu:");
 			System.out.println("1. Query Avaliability of facility");
 			System.out.println("2. Book facility for a period of time");
@@ -74,144 +72,211 @@ public class ClientRunner {
 			input = scanner.nextLine();
 			System.out.println("Your selection is "+input);
 			
+			//format to check for hours with leading 0
+			String format = "^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$";
 			try {
 				int option = Integer.parseInt(input);
+				
+				//some common local variables within each scope that will be used 
 				String facilityName;
 				HashMap<String,Object> reply;
-				switch((byte)option) {
-				case 1:
-					System.out.println("Type the facility name that you want to query:");
-					facilityName = scanner.nextLine();
-					System.out.println("You have selected facility: "+facilityName);
-					
-					byte[] daysArray = ClientRunner.promptForDays(-1, (byte)(option-1));
-					reply = client.sendQueryRequest(facilityName, daysArray);
-					if(((byte)reply.get("success")) == 0) {
-						System.out.println((String)reply.get("error_message"));
-						break;
-					}
-					for(int day = 0; day < daysArray.length; day++) {
-						short[] timeslots_avaliable = (short[]) reply.get("timeslots_avaliable_"+day);
-						
-						for(int i = 0; i < timeslots_avaliable.length; i+=2) {
-							String formattedStart = Utils.parseMinuteOfDay(timeslots_avaliable[i]);
-							String formattedEnd = Utils.parseMinuteOfDay(timeslots_avaliable[i+1]);
-							
-							System.out.println(formattedStart+ " to "+formattedEnd+" is avaliable");
-						}
-					}
-					break;
-				case 2:
-					System.out.println("Type the name of the facility you would like to book:");
-					facilityName = scanner.nextLine();
-					System.out.println("You have selected facility: "+facilityName);
-					System.out.println("What type would like to book the facility?");
-					// TODO: loop until get start time?
-					System.out.print("Start Time(enter in 24hours format eg. 23:59, 08:00):");
-					String startTime = scanner.nextLine();
 				
-					System.out.print("End Time(enter in 24hours format eg. 23:59, 08:00):");
-					String endTime = scanner.nextLine();
-					System.out.println("Making booking for facility" + facilityName+ " Start time: "+startTime+" end time: "+endTime);
-					
-					byte day = ClientRunner.promptForDay((byte)(option-1));
-					reply = client.sendBookRequest(facilityName, day, startTime, endTime);
-					if(((byte)reply.get("success")) == 0) {
-						System.out.println((String)reply.get("error_message"));
-						break;
-					}
-					if(((byte)reply.get("success")) == 1) {
-						String confirmId = (String) reply.get("confirm_id");
+				switch((byte)(option -1)) {
+					case Constants.QUERY_FACILITY:
+						System.out.println("Type the facility name that you want to query:");
+						facilityName = scanner.nextLine();
+						System.out.println("You have selected facility: "+facilityName);
 						
-						System.out.println("Booking for "+facilityName+" from "+startTime+" to "+endTime+" added. :)");
-						System.out.println("Confirmation ID for booking is: "+confirmId);
-					}
-					break;
-				case 3:
-					System.out.println("Enter booking confirmation ID:");
-					String confirmationID = scanner.nextLine();
-					String offsetString;
-					do {
-						System.out.println("Enter offset by specifying hours and minutes to change");
-						System.out.println("Enter +01:00 to postpone by 1 Hour, Enter -01:00 to advance the booking by 1 Hour");
-						offsetString = scanner.nextLine();
-						if(offsetString.length() != 6 || !(offsetString.startsWith("+") || offsetString.startsWith("-"))) {
-							System.out.println("Invalid input format, enter again");
+						//common utility to prompt for days
+						byte[] daysArray = ClientRunner.promptForDays(-1, (byte)(option-1));
+						
+						//send and blocks until reply is sent over
+						reply = client.sendQueryRequest(facilityName, daysArray);
+						
+						// if unsuccessful, display error message
+						if(((byte)reply.get("success")) == (byte)0) {
+							System.out.println((String)reply.get("error_message"));
+							break;
 						}
-					}while(offsetString.length() != 6);
-					char sign = offsetString.charAt(0);
-					offsetString = offsetString.replace("+", "").replace("-", "");
-					short offsetDuration = Utils.parseTextToMinuteOfDay(offsetString);
-					if(sign == '+') {
-						offsetDuration *= 1;
-					}else {
-						offsetDuration *= -1;
-					}
-					
-					reply = client.sendChangeRequest(confirmationID, offsetDuration);
-					if(((byte)reply.get("success")) == 0) {
-						System.out.println((String)reply.get("error_message"));
-						break;
-					}
-					if(((byte)reply.get("success")) == 1) {
-						String confirmId = (String) reply.get("confirm_id");
-						
-						//TODO: send updated timing over too
-						System.out.println("Booking updated and has been "+(offsetDuration > 0 ? "advanced" : "postponed" )+" by "+ Math.abs(offsetDuration)+" hours");
-					}
-					break;
-				case 4:
-					System.out.println("Enter facility name to monitor:");
-					facilityName = scanner.nextLine();
-					System.out.println("Enter monitor interval");
-					System.out.println("Format: 01:00 for 1 hour, 00:30 for 30 minutes");
-					String lengthMonitor = scanner.nextLine();
-					short duration = Utils.parseTextToMinuteOfDay(lengthMonitor);
-					reply = client.sendMonitorRequest(facilityName, duration);
-					if((byte) reply.get("success") == 1) {
-						System.out.println("Subscribed");
-					}
-					long monitorDeadline = System.nanoTime() + TimeUnit.NANOSECONDS.convert(duration, TimeUnit.MINUTES);
-					while ( System.nanoTime() < monitorDeadline){
-					  int remainingMs = (int)((monitorDeadline - System.nanoTime()) / 1000000);
-					  try {
-							System.out.println("remaining "+ remainingMs);
-							HashMap<String, Object> callbackReply = client.listenForReply(remainingMs);
-							System.out.println("Updated avaliability for "+facilityName);
-							for(int i = 0 ; i < 7; i++) {
-								// Print each timeslot updated avalibility
-								short[] timeslots  = (short[])callbackReply.get("timeslots_avaliable_"+i);
-								System.out.println("Updated avaliability for "+Constants.days[i]+" ");
+						//for each of the days that was selected, avaliability can be found in the time array timeslots_avaliable_0, _1 , _2 for Monday, Tues and Wednesday so on and so forth
+						for(int day = 0; day < daysArray.length; day++) {
+							short[] timeslots_avaliable = (short[]) reply.get("timeslots_avaliable_"+daysArray[day]);
+							
+							//each avaliability is sent as start, end, start, end, so need to print it out 2 values each, there are n/2 intervals for n size data
+							for(int i = 0; i < timeslots_avaliable.length; i+=2) {
+								String formattedStart = Utils.parseMinuteOfDay(timeslots_avaliable[i]);
+								String formattedEnd = Utils.parseMinuteOfDay(timeslots_avaliable[i+1]);
 								
-								for(int j = 0; j < timeslots.length; j+=2) {
-									System.out.println(Utils.parseMinuteOfDay(timeslots[j])+" to "+Utils.parseMinuteOfDay(timeslots[j+1])+" is now avaliable");
-									
-								}
+								System.out.println(formattedStart+ " to "+formattedEnd+" is avaliable");
 							}
-						} catch (IOException e) {
-							System.out.println("timeout");
 						}
-					}
-					break;
-				case 5:
-					System.out.println("Enter confirmation ID to cancel booking:");
-					String confirmID = scanner.nextLine();
-					reply = client.sendCancelRequest(confirmID);
-					
-					break;
-				case 6:
-					System.out.println("Listing facilities:");
-					reply = client.sendListFacilityNames();
-					String[] names = (String[]) reply.get("facility_names");
-					for(int i =0 ; i < names.length; i++) {
-						System.out.println((i+1)+". "+ names[i]);
-					}
-					break;
+						break;
+					case Constants.BOOK_FACILITY:
+						System.out.println("Type the name of the facility you would like to book:");
+						facilityName = scanner.nextLine();
+						System.out.println("You have selected facility: "+facilityName);
+						System.out.println("What type would like to book the facility?");
+						String startTime;
+						
+						//for start and end time, loop until a valid 24hour format data is entered
+						do {
+							System.out.print("Start Time(enter in 24hours format eg. 23:59, 08:00):");
+							startTime = scanner.nextLine();
+							if(!startTime.matches(format)) {
+								System.out.println("Invalid Start Time entered: expected format should be like 23:59, 08:00");
+							}
+						}while(!startTime.matches(format));
+						String endTime;
+	
+						do {
+							System.out.print("End Time(enter in 24hours format eg. 23:59, 08:00):");
+							endTime = scanner.nextLine();
+							if(!endTime.matches(format)) {
+								System.out.println("Invalid  Time entered: expected format should be like 23:59, 08:00");
+							}
+						}while(!endTime.matches(format));
+						
+						System.out.println("Making booking for facility" + facilityName+ " Start time: "+startTime+" end time: "+endTime);
+						
+						// prompt for which day is booking
+						byte day = ClientRunner.promptForDay((byte)(option-1));
+						
+						// send and blocks until reply is back
+						reply = client.sendBookRequest(facilityName, day, startTime, endTime);
+						// if unsuccessful, print error message
+						if(((byte)reply.get("success")) == (byte)0) {
+							System.out.println((String)reply.get("error_message"));
+							break;
+						}
+						// if successful, print confirmation ID and the added booking
+						if(((byte)reply.get("success")) == (byte)1) {
+							String confirmId = (String) reply.get("confirm_id");
+							
+							System.out.println("Booking for "+facilityName+" from "+startTime+" to "+endTime+" added. :)");
+							System.out.println("Confirmation ID for booking is: "+confirmId);
+						}
+						break;
+					case Constants.CHANGE_BOOKING:
+						System.out.println("Enter booking confirmation ID:");
+						String confirmationID = scanner.nextLine();
+						String offsetString;
+						
+						//loop until a valid duration is entered
+						do {
+							System.out.println("Enter duration by specifying hours and minutes to change");
+							System.out.println("Enter +01:00 to postpone by 1 Hour, Enter -01:00 to advance the booking by 1 Hour");
+							offsetString = scanner.nextLine();
+							if(offsetString.length() != 6 || !(offsetString.startsWith("+") || offsetString.startsWith("-"))) {
+								System.out.println("Invalid input format, enter again");
+								
+							}
+						}while(offsetString.length() != 6 || !(offsetString.startsWith("+") || offsetString.startsWith("-")));
+						
+						//reuse existing string to minute of day
+						char sign = offsetString.charAt(0);
+						offsetString = offsetString.replace("+", "").replace("-", "");
+						short offsetDuration = Utils.parseTextToMinuteOfDay(offsetString);
+						if(sign == '+') {
+							offsetDuration *= 1;
+						}else {
+							offsetDuration *= -1;
+						}
+						
+						// send and blocks until reply comes back 
+						reply = client.sendChangeRequest(confirmationID, offsetDuration);
+						
+						// if unsuccessful, print error message
+						if(((byte)reply.get("success")) == (byte)0) {
+							System.out.println((String)reply.get("error_message"));
+							break;
+						}
+						// if successful, inform user that booking has been changed
+						if(((byte)reply.get("success")) == (byte)1) {
+							System.out.println("Booking updated and has been "+(offsetDuration > 0 ? "advanced" : "postponed" )+" by "+ Math.abs(offsetDuration/60)+" hours " + Math.abs(offsetDuration % 60)+" minutes ");
+						}
+						break;
+					case Constants.MONITOR_AVALIABILITY:
+						System.out.println("Enter facility name to monitor:");
+						facilityName = scanner.nextLine();
+						System.out.println("Enter monitor interval");
+						System.out.println("Format: 01:00 for 1 hour, 00:30 for 30 minutes");
+						String lengthMonitor;
+						do {
+							lengthMonitor = scanner.nextLine();
+							if(!lengthMonitor.matches(format)) {
+								System.out.println("Invalid Monitoring entered: expected format should be like this: 01:00 for 1 hour, 00:30 for 30min");
+							}
+						}while(!lengthMonitor.matches(format));
+						short duration = Utils.parseTextToMinuteOfDay(lengthMonitor);
+						
+						// send request and block until reply is back
+						reply = client.sendMonitorRequest(facilityName, duration);
+						// if unsuccessful, print error message
+						if(((byte)reply.get("success")) == (byte)0) {
+							System.out.println((String)reply.get("error_message"));
+							break;
+						}
+						//if successful, inform user that avaliability is being monitored
+						if((byte) reply.get("success") == 1) {
+							System.out.println("Monitoring...");
+						}
+						// loop until the interval is expired
+						long monitorDeadline = System.nanoTime() + TimeUnit.NANOSECONDS.convert(duration, TimeUnit.MINUTES);
+						while ( System.nanoTime() < monitorDeadline){
+							
+						  // only listen remaining duration to the deadline
+						  int remainingMs = (int)((monitorDeadline - System.nanoTime()) / 1000000);
+						  try {
+								// keep listening for any new replies for specified duration
+							  	HashMap<String, Object> callbackReply = client.listenForReply(remainingMs);
+								System.out.println("Updated avaliability for "+facilityName);
+								
+								//check which days are updated and print them out 
+								for(int i = 0 ; i < 7; i++) {
+									if(callbackReply.get("timeslots_avaliable_"+i) != null) {
+										short[] timeslots  = (short[])callbackReply.get("timeslots_avaliable_"+i);
+										System.out.println(Constants.days[i]+" Avaliability updated: ");
+										
+										for(int j = 0; j < timeslots.length; j+=2) {
+											System.out.println(Utils.parseMinuteOfDay(timeslots[j])+" to "+Utils.parseMinuteOfDay(timeslots[j+1])+" is now avaliable");
+										}
+									}
+								}
+							} catch (IOException e) {
+								
+							}
+						}
+						System.out.println("Monitoring ended");
+						break;
+					case Constants.CANCEL_BOOKING:
+						System.out.println("Enter confirmation ID to cancel booking:");
+						String confirmID = scanner.nextLine();
+						reply = client.sendCancelRequest(confirmID);
+						if(((byte)reply.get("success")) == (byte)0) {
+							System.out.println((String)reply.get("error_message"));
+							break;
+						}
+						if(((byte)reply.get("success")) == (byte)1) {
+							System.out.println((String)reply.get("error_message"));
+							break;
+						}
+						break;
+					case Constants.LIST_FACILITY:
+						System.out.println("Listing facilities:");
+						reply = client.sendListFacilityNames();
+						String[] names = (String[]) reply.get("facility_names");
+						for(int i =0 ; i < names.length; i++) {
+							System.out.println((i+1)+". "+ names[i]);
+						}
+						break;
 				}
 			}catch(NumberFormatException e) {
 				if(!input.equals("q")) {
 					System.out.println("Input select is not a valid option in menu");
 				}
+			}
+			if(input.equals("q")) {
+				System.out.println("Quitting program");
 			}
 		}
 	}
