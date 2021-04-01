@@ -23,7 +23,7 @@ public class Client {
 		try {
 			socket = new DatagramSocket();
 			socket.setSoTimeout(Constants.TIMEOUT);
-			address = InetAddress.getByName("192.168.1.117");
+			address = InetAddress.getByName("192.168.1.146");
 		} catch (SocketException | UnknownHostException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
