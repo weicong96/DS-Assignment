@@ -249,7 +249,7 @@ public class Server {
 							}
 						}
 						if(foundBookingIndex != -1) {
-							// found booking with same confirmation id, see if can advanced first:
+							// found booking with same confirmation id, see if can advanced first
 							Booking currentBooking = this.facilities[foundFacilityIndex].getBookings().get(foundBookingIndex);
 							Booking newBooking = new Booking(currentBooking.getStartTime(), currentBooking.getEndTime(), currentBooking.getDay());
 							newBooking.setConfirmID(currentBooking.getConfirmID());
@@ -272,6 +272,8 @@ public class Server {
 					case Constants.MONITOR_AVALIABILITY:
 						facilityName = (String) requestPayload.get("facility_name");
 						short duration = (short) requestPayload.get("duration");
+						
+						//check if facility exists, return error message if it does not exist
 						facilityIndex = getFacilityIndexByName(facilityName);
 						if(facilityIndex == -1) {
 							//indicate success is false
@@ -281,6 +283,7 @@ public class Server {
 						}else {
 							reply.put("success", ((byte) 1));
 						}
+						//add monitor to list of monitors for that facility
 						Monitor monitor = new Monitor(packet.getAddress().getHostAddress(), packet.getPort(), (Calendar.getInstance().getTimeInMillis()/1000l) + (duration * 60), requestId);
 						
 						ArrayList<Monitor> monitors = this.monitors.getOrDefault(facilityName, new ArrayList<Monitor>());
@@ -289,7 +292,9 @@ public class Server {
 						
 						break;
 					case Constants.CANCEL_BOOKING:
+						
 						String confirmationID = (String) requestPayload.get("confirm_id");
+						//check if confirmation id exists, return error message if it does not exist
 						facilityIndex = getFacilityByConfirmID(confirmationID);
 						if(facilityIndex == -1) {
 							//indicate success is false
@@ -299,6 +304,8 @@ public class Server {
 						}else {
 							reply.put("success", ((byte) 1));
 						}
+						
+						// remove booking from current booking
 						ArrayList<Booking> bookings = this.facilities[facilityIndex].getBookings();
 						int bookingIndex = -1;
 						for(int i = 0; i < bookings.size(); i++) {
@@ -314,6 +321,7 @@ public class Server {
 						this.informAllMonitors(this.facilities[facilityIndex],affectedDay);
 						break;
 					case Constants.LIST_FACILITY:
+						// return list of facilities
 						String[] facilitiesNames = new String[this.facilities.length];
 						for(int i = 0 ; i < facilitiesNames.length; i++) {
 							facilitiesNames[i] = this.facilities[i].getName();

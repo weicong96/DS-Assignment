@@ -11,17 +11,21 @@ import java.util.Set;
 import java.util.TimeZone;
 
 public class Utils {
+	
+	// parse minute of day to HH:MM format
 	public static String parseMinuteOfDay(short minuteOfDay) {
 		int hour = (minuteOfDay / 60);
 		int minute = (minuteOfDay % 60);
 		
 		return getFormat(hour, minute);
 	}
+	// format hour and minute properly with 0 to 23 and 0 to 60 range
 	public static String getFormat(int hour, int minute) {
 		hour = hour % 24;
 		minute = minute % 60;
 		return String.format("%02d:%02d", hour, minute);
 	}
+	// parse from HH:MM format to minute of day
 	public static short parseTextToMinuteOfDay(String text) {
 		String[] parts = text.split(":");
 		
@@ -30,6 +34,7 @@ public class Utils {
 		short offsetDuration = (short)(hours * 60 + mins);
 		return offsetDuration;
 	}
+	//for merging an array
 	public static byte[] combineByteArray(byte[] a, byte[] b) {
 		byte[] combined = new byte[a.length + b.length];
 		for (int i = 0; i < combined.length; ++i){
@@ -37,6 +42,7 @@ public class Utils {
 		}
 		return combined;
 	}
+	// convert short to 2 bytes
 	public static byte[] toBytes(short i) {
 		  byte[] result = new byte[2];
 
@@ -45,6 +51,7 @@ public class Utils {
 		  
 		  return result;
 	}
+	// convert int to 4 bytes
 	public static byte[] toBytes(int i) {
 	  byte[] result = new byte[4];
 
@@ -55,6 +62,7 @@ public class Utils {
 	  
 	  return result;
 	}
+	// print contents of what is send and receive in both directions
 	public static void printContents(HashMap<String, Object> payload, boolean sending) {
 		System.out.println("INFO: "+(sending ? "Sending" : "Receiving ")+" the following contents");
 		Set<String> fieldsSet = payload.keySet();
@@ -85,6 +93,8 @@ public class Utils {
 			}
 		}
 	}
+	
+	//marshall according the request message
 	public static byte[] marshallPayload(HashMap<String, Object> _payload) {
 		HashMap<String, Object> payload = (HashMap<String, Object>) _payload.clone();
 		byte messageType = (byte)payload.get("message_type");
@@ -101,6 +111,7 @@ public class Utils {
 		result = combineByteArray(result, new byte[]{serviceType});
 		result = combineByteArray(result, new byte[]{fieldsLength});
 		
+		//don't parse fields that message_type, service_type etc dont get parsed
 		Set<String> fieldsSet = payload.keySet();
 		fieldsSet.removeAll(Arrays.asList(new String[] { "message_type", "service_type", "fields_length", "request_id", "reply_id"}));
 		for(String field : fieldsSet) {
@@ -153,6 +164,8 @@ public class Utils {
 		}
 		return result;
 	}
+	
+	// umarshall byte into request or reply payload
 	public static HashMap<String, Object> unmarshallPayload(byte[] data) {
 		HashMap<String, Object> payload = new HashMap<String, Object>();
 		payload.put("message_type", (byte) data[0]);
