@@ -31,7 +31,7 @@ public class ClientRunner {
 							
 			dayOfWeek = scanner.nextByte();
 			scanner.nextLine();
-			if(dayOfWeek != 0) {
+			if(dayOfWeek >= 1 && dayOfWeek <= 7) {
 				days.add((byte) (dayOfWeek)); 	
 				System.out.print("Current "+(operationType == Constants.BOOK_FACILITY ? "Booking" : "Query")+" days: ");
 				
@@ -42,6 +42,10 @@ public class ClientRunner {
 						System.out.print(Constants.getDay((byte) days.get(i))+" ,");
 					}
 				}	
+			}else if(dayOfWeek == 0){
+				System.out.println("Completed day selection");
+			}else {
+				System.out.println("Invalid day selection, try again");
 			}
 			count --;	
 		}while(dayOfWeek != 0 && count != 0);
@@ -115,7 +119,7 @@ public class ClientRunner {
 						System.out.println("Type the name of the facility you would like to book:");
 						facilityName = scanner.nextLine();
 						System.out.println("You have selected facility: "+facilityName);
-						System.out.println("What type would like to book the facility?");
+						System.out.println("What time would like to book the facility?");
 						String startTime;
 						
 						//for start and end time, loop until a valid 24hour format data is entered
@@ -136,7 +140,14 @@ public class ClientRunner {
 							}
 						}while(!endTime.matches(format));
 						
-						System.out.println("Making booking for facility" + facilityName+ " Start time: "+startTime+" end time: "+endTime);
+						short start = Utils.parseTextToMinuteOfDay(startTime);
+						short end = Utils.parseTextToMinuteOfDay(endTime);
+						if(start > end) {
+							System.out.println("Invalid start and end time input. Start is suppose to be earlier than end time. Try again.");
+							break;
+						}
+						
+						System.out.println("Making booking for facility " + facilityName+ " Start time: "+startTime+" end time: "+endTime);
 						
 						// prompt for which day is booking
 						byte day = ClientRunner.promptForDay((byte)(option-1));
@@ -257,7 +268,7 @@ public class ClientRunner {
 							break;
 						}
 						if(((byte)reply.get("success")) == (byte)1) {
-							System.out.println((String)reply.get("error_message"));
+							System.out.println("Booking cancelled.");
 							break;
 						}
 						break;

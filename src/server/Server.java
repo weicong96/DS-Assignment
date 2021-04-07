@@ -255,7 +255,8 @@ public class Server {
 							newBooking.setConfirmID(currentBooking.getConfirmID());
 							newBooking.offsetBooking(offset);
 							int overlapBooking = this.facilities[foundFacilityIndex].checkAndGetConflictBooking(newBooking);
-							if(overlapBooking != -1) {
+							System.out.println("overlapped booking"+ " "+overlapBooking+ " "+foundBookingIndex);
+							if(overlapBooking != -1 && overlapBooking != foundBookingIndex) {
 								reply.put("success", ((byte)0));
 								
 								reply.put("error_message", "Error: New booking overlaps with another existing booking");
